@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maripo Transport</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+        header { background: #1e293b; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155; }
+        header h1 { font-size: 20px; font-weight: 700; color: #38bdf8; }
+        .tabs { display: flex; gap: 4px; padding: 0 24px; background: #1e293b; border-bottom: 1px solid #334155; }
+        .tab { padding: 12px 20px; cursor: pointer; color: #94a3b8; font-size: 14px; font-weight: 500; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .tab:hover { color: #e2e8f0; }
+        .tab.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+        .content { padding: 24px; max-width: 1400px; margin: 0 auto; }
+        .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .cal-nav-btn { background: #334155; border: none; color: #e2e8f0; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+        .cal-nav-btn:hover { background: #475569; }
+        .cal-period-label { font-size: 16px; font-weight: 600; color: #f1f5f9; }
+        .cal-grid { display: grid; grid-template-columns: 160px repeat(var(--cal-days, 7), 1fr); border: 1px solid #334155; border-radius: 8px; overflow: hidden; }
+        .cal-corner { background: #1e293b; padding: 8px; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; border-bottom: 1px solid #334155; border-right: 1px solid #334155; }
+        .cal-day-header { background: #1e293b; padding: 8px 4px; text-align: center; border-right: 1px solid #334155; }
+        .cal-day-header:last-child { border-right: none; }
+        .cal-day-name { font-size: 11px; color: #64748b; text-transform: uppercase; }
+        .cal-day-num { font-size: 16px; font-weight: 600; color: #e2e8f0; margin-top: 2px; }
+        .cal-day-num.today { color: #38bdf8; }
+        .cal-car-row { display: contents; }
+        .cal-car-label { background: #1e293b; padding: 10px 12px; font-size: 13px; font-weight: 500; border-right: 1px solid #334155; border-bottom: 1px solid #334155; display: flex; flex-direction: column; gap: 2px; }
+        .cal-car-name { color: #e2e8f0; }
+        .cal-car-plate { font-size: 11px; color: #64748b; font-family: monospace; }
+        .cal-car-status { font-size: 10px; margin-top: 2px; }
+        .cal-cell { border-right: 1px solid #1e293b; border-bottom: 1px solid #1e293b; min-height: 56px; position: relative; background: #0f172a; }
+        .cal-cell:last-child { border-right: none; }
+        .cal-cell:hover { background: #1a2538; }
+        .cal-bar { position: absolute; left: 2px; right: 2px; height: 28px; border-radius: 4px; font-size: 11px; color: white; padding: 2px 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; z-index: 1; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+        .cal-bar:hover { filter: brightness(1.15); }
+        .cal-bar.scheduled { background: #3b82f6; }
+        .cal-bar.in_transit { background: #f59e0b; }
+        .cal-bar.completed { background: #10b981; }
+        .cal-bar.cancelled { background: #6b7280; }
+        .cal-bar .cal-bar-cargo { overflow: hidden; text-overflow: ellipsis; }
+        .cal-bar-priority-1 { border-left: 3px solid #f59e0b; }
+        .cal-bar-priority-2 { border-left: 3px solid #3b82f6; }
+        .cal-bar-priority-3 { border-left: 3px solid #ef4444; }
+        .cal-tooltip { position: fixed; background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; font-size: 12px; z-index: 300; pointer-events: none; max-width: 220px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+        .cal-tooltip-title { font-weight: 600; color: #f1f5f9; margin-bottom: 4px; }
+        .cal-tooltip-meta { color: #94a3b8; line-height: 1.5; }
+        .hidden { display: none; }
+        .card { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid #334155; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .card-title { font-size: 16px; font-weight: 600; color: #f1f5f9; }
+        .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; }
+        .btn-primary { background: #38bdf8; color: #0f172a; }
+        .btn-primary:hover { background: #7dd3fc; }
+        .btn-secondary { background: #334155; color: #e2e8f0; }
+        .btn-secondary:hover { background: #475569; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-danger:hover { background: #ef4444; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 10px 12px; font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #334155; }
+        td { padding: 12px; font-size: 14px; border-bottom: 1px solid #1e293b; }
+        tr:hover td { background: #1e293b; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; }
+        .badge-available { background: #065f46; color: #6ee7b7; }
+        .badge-in_transit { background: #1e3a5f; color: #60a5fa; }
+        .badge-new { background: #3730a3; color: #a5b4fc; }
+        .badge-planned { background: #1e3a5f; color: #93c5fd; }
+        .badge-scheduled { background: #374151; color: #d1d5db; }
+        .badge-completed { background: #064e3b; color: #34d399; }
+        .badge-cancelled { background: #7f1d1d; color: #fca5a5; }
+        .conflict-badge { background: #dc2626; color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-left: 8px; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; }
+        .modal.hidden { display: none; }
+        .modal-content { background: #1e293b; border-radius: 16px; padding: 24px; width: 480px; max-width: 95vw; border: 1px solid #334155; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-title { font-size: 18px; font-weight: 600; }
+        .modal-close { background: none; border: none; color: #94a3b8; font-size: 24px; cursor: pointer; }
+        .form-group { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 13px; font-weight: 500; color: #94a3b8; margin-bottom: 6px; }
+        .form-input { width: 100%; padding: 10px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 14px; }
+        .form-input:focus { outline: none; border-color: #38bdf8; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .board { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+        .board-section { background: #1e293b; border-radius: 12px; padding: 16px; border: 1px solid #334155; }
+        .board-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #334155; }
+        .board-card { background: #0f172a; border-radius: 8px; padding: 12px; margin-bottom: 8px; border: 1px solid #334155; cursor: pointer; transition: all 0.2s; }
+        .board-card:hover { border-color: #38bdf8; }
+        .board-card-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+        .board-card-meta { font-size: 12px; color: #94a3b8; }
+        .board-card-meta span { margin-right: 12px; }
+        .empty-state { text-align: center; padding: 40px 20px; color: #64748b; }
+        .empty-state-icon { font-size: 48px; margin-bottom: 12px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+        .stat-card { background: #1e293b; border-radius: 12px; padding: 16px; border: 1px solid #334155; }
+        .stat-value { font-size: 28px; font-weight: 700; color: #38bdf8; }
+        .stat-label { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+        .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; z-index: 200; }
+        .toast-success { background: #065f46; color: #6ee7b7; }
+        .toast-error { background: #991b1b; color: #fca5a5; }
+        .actions { display: flex; gap: 6px; }
+        .car-plate { font-family: monospace; font-size: 12px; background: #334155; padding: 2px 6px; border-radius: 4px; }
+        .cargo-weight { color: #94a3b8; font-size: 12px; }
+        .priority-1 { border-left: 3px solid #f59e0b; }
+        .priority-2 { border-left: 3px solid #3b82f6; }
+        .priority-3 { border-left: 3px solid #ef4444; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🚚 Maripo Transport</h1>
+        <button class="btn btn-secondary" onclick="refreshAll()">⟳ Odśwież</button>
+    </header>
+    <nav class="tabs">
+        <div class="tab active" data-tab="board">Tablica</div>
+        <div class="tab" data-tab="calendar">Kalendarz</div>
+        <div class="tab" data-tab="cars">Samochody</div>
+        <div class="tab" data-tab="cargos">Ładunki</div>
+        <div class="tab" data-tab="transports">Transporty</div>
+    </nav>
+    <main class="content">
+        <!-- Board View -->
+        <section id="tab-board">
+            <h2 style="font-size:20px;margin-bottom:16px;">Tablica zarządzania</h2>
+            <div class="stats" id="stats"></div>
+            <div id="conflicts"></div>
+            <div class="board" id="board"></div>
+        </section>
+        <!-- Calendar View -->
+        <section id="tab-calendar" class="hidden">
+            <h2 style="font-size:20px;margin-bottom:16px;">Kalendarz transportów</h2>
+            <div class="card">
+                <div class="cal-header">
+                    <button class="cal-nav-btn" onclick="calNav(-1)">← Wstecz</button>
+                    <span class="cal-period-label" id="cal-period-label"></span>
+                    <button class="cal-nav-btn" onclick="calNav(1)">Dalej →</button>
+                </div>
+                <div id="calendar-grid" style="overflow-x:auto;"></div>
+            </div>
+        </section>
+        <!-- Cars View -->
+        <section id="tab-cars" class="hidden">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Samochody</span>
+                    <button class="btn btn-primary" onclick="openCarModal()">+ Dodaj samochód</button>
+                </div>
+                <table>
+                    <thead><tr><th>Nazwa</th><th>Tablica</th><th>Marka</th><th>Pojemność</th><th>Status</th><th>Akcje</th></tr></thead>
+                    <tbody id="cars-table"></tbody>
+                </table>
+            </div>
+        </section>
+        <!-- Cargos View -->
+        <section id="tab-cargos" class="hidden">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Ładunki</span>
+                    <button class="btn btn-primary" onclick="openCargoModal()">+ Dodaj ładunek</button>
+                </div>
+                <table>
+                    <thead><tr><th>Nazwa</th><th>Waga</th><th>Priorytet</th><th>Status</th><th>Adresy</th><th>Akcje</th></tr></thead>
+                    <tbody id="cargos-table"></tbody>
+                </table>
+            </div>
+        </section>
+        <!-- Transports View -->
+        <section id="tab-transports" class="hidden">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Transporty</span>
+                    <button class="btn btn-primary" onclick="openTransportModal()">+ Nowy transport</button>
+                </div>
+                <table>
+                    <thead><tr><th>ID</th><th>Samochód</th><th>Ładunek</th><th>Start</th><th>Koniec</th><th>Status</th><th>Akcje</th></tr></thead>
+                    <tbody id="transports-table"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+    <!-- Car Modal -->
+    <div id="car-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title" id="car-modal-title">Nowy samochód</span>
+                <button class="modal-close" onclick="closeCarModal()">×</button>
+            </div>
+            <form id="car-form" onsubmit="saveCar(event)">
+                <input type="hidden" id="car-id">
+                <div class="form-group"><label class="form-label">Nazwa *</label><input class="form-input" id="car-name" required></div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Tablica</label><input class="form-input" id="car-plate"></div>
+                    <div class="form-group"><label class="form-label">Marka</label><input class="form-input" id="car-brand"></div>
+                </div>
+                <div class="form-group"><label class="form-label">Max ładowność (kg)</label><input class="form-input" type="number" id="car-capacity" value="5000"></div>
+                <div class="form-group"><label class="form-label">Status</label><select class="form-input" id="car-status"><option value="available">Dostępny</option><option value="in_transit">W trasie</option></select></div>
+                <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">Zapisz</button>
+            </form>
+        </div>
+    </div>
+    <!-- Cargo Modal -->
+    <div id="cargo-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title" id="cargo-modal-title">Nowy ładunek</span>
+                <button class="modal-close" onclick="closeCargoModal()">×</button>
+            </div>
+            <form id="cargo-form" onsubmit="saveCargo(event)">
+                <input type="hidden" id="cargo-id">
+                <div class="form-group"><label class="form-label">Nazwa *</label><input class="form-input" id="cargo-name" required></div>
+                <div class="form-group"><label class="form-label">Waga (kg)</label><input class="form-input" type="number" id="cargo-weight" value="0"></div>
+                <div class="form-group"><label class="form-label">Priorytet</label><select class="form-input" id="cargo-priority"><option value="1">1 - Niski</option><option value="2">2 - Średni</option><option value="3">3 - Wysoki</option></select></div>
+                <div class="form-group"><label class="form-label">Adres odbioru</label><input class="form-input" id="cargo-pickup"></div>
+                <div class="form-group"><label class="form-label">Adres dostawy</label><input class="form-input" id="cargo-delivery"></div>
+                <div class="form-group"><label class="form-label">Opis</label><textarea class="form-input" id="cargo-desc" rows="2"></textarea></div>
+                <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">Zapisz</button>
+            </form>
+        </div>
+    </div>
+    <!-- Transport Modal -->
+    <div id="transport-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">Nowy transport</span>
+                <button class="modal-close" onclick="closeTransportModal()">×</button>
+            </div>
+            <form id="transport-form" onsubmit="saveTransport(event)">
+                <input type="hidden" id="transport-id">
+                <div class="form-group">
+                    <label class="form-label">Samochód *</label>
+                    <select class="form-input" id="transport-car" required></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ładunek *</label>
+                    <select class="form-input" id="transport-cargo" required></select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Start *</label><input class="form-input" type="datetime-local" id="transport-start" required></div>
+                    <div class="form-group"><label class="form-label">Koniec *</label><input class="form-input" type="datetime-local" id="transport-end" required></div>
+                </div>
+                <div class="form-group"><label class="form-label">Notatki</label><textarea class="form-input" id="transport-notes" rows="2"></textarea></div>
+                <div id="transport-conflict" class="hidden" style="background:#7f1d1d;padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px;"></div>
+                <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:#94a3b8;">
+                    <input type="checkbox" id="transport-force"> Force (ignoruj konflikt)
+                </label>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Zapisz</button>
+            </form>
+        </div>
+    </div>
+    <!-- Reschedule Modal -->
+    <div id="reschedule-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">Przeplanuj transport</span>
+                <button class="modal-close" onclick="closeRescheduleModal()">×</button>
+            </div>
+            <form id="reschedule-form" onsubmit="saveReschedule(event)">
+                <input type="hidden" id="reschedule-id">
+                <div class="form-group">
+                    <label class="form-label">Samochód</label>
+                    <select class="form-input" id="reschedule-car"></select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Nowy start</label><input class="form-input" type="datetime-local" id="reschedule-start"></div>
+                    <div class="form-group"><label class="form-label">Nowy koniec</label><input class="form-input" type="datetime-local" id="reschedule-end"></div>
+                </div>
+                <div id="reschedule-conflict" class="hidden" style="background:#7f1d1d;padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px;"></div>
+                <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:#94a3b8;">
+                    <input type="checkbox" id="reschedule-force"> Force (ignoruj konflikt)
+                </label>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Zapisz</button>
+            </form>
+        </div>
+    </div>
+    <div id="toast" class="toast hidden"></div>
+    <script>
+        const API = '/api';
+        let boardData = {};
+        document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+        function switchTab(name) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+            document.querySelectorAll('section[id^="tab-"]').forEach(s => s.classList.toggle('hidden', s.id !== `tab-${name}`));
+            if (name === 'board') renderBoard();
+            if (name === 'calendar') renderCalendar();
+            if (name === 'cars') renderCars();
+            if (name === 'cargos') renderCargos();
+            if (name === 'transports') renderTransports();
+        }
+        async function refreshAll() { await loadBoard(); if (document.querySelector('.tab.active').dataset.tab !== 'board') switchTab(document.querySelector('.tab.active').dataset.tab); showToast('Odświeżono'); }
+        async function loadBoard() { try { const r = await fetch(`${API}/board`); boardData = await r.json(); } catch { showToast('Błąd ładowania', 'error'); } }
+        function showToast(msg, type = 'success') { const t = document.getElementById('toast'); t.textContent = msg; t.className = `toast toast-${type}`; t.classList.remove('hidden'); setTimeout(() => t.classList.add('hidden'), 3000); }
+
+        // ── Board ──
+        async function renderBoard() {
+            await loadBoard();
+            const { cars, cargos, unassignedCargos, transports, conflicts } = boardData;
+            document.getElementById('stats').innerHTML = `
+                <div class="stat-card"><div class="stat-value">${cars.length}</div><div class="stat-label">Samochody</div></div>
+                <div class="stat-card"><div class="stat-value">${cargos.length}</div><div class="stat-label">Ładunki</div></div>
+                <div class="stat-card"><div class="stat-value">${unassignedCargos.length}</div><div class="stat-label">Nieprzypisane</div></div>
+                <div class="stat-card"><div class="stat-value">${transports.length}</div><div class="stat-label">Transporty</div></div>`;
+            if (conflicts.length) document.getElementById('conflicts').innerHTML = `<div class="card" style="border-color:#dc2626;margin-bottom:16px;"><span class="card-title" style="color:#fca5a5;">⚠ Konflikty: ${conflicts.length}</span><div style="margin-top:8px;font-size:13px;color:#fca5a5;">${conflicts.map(c => `${c.carName}: transporty ${c.transportIds.join(', ')}`).join('<br>')}</div></div>`;
+            else document.getElementById('conflicts').innerHTML = '';
+            const sections = { scheduled: 'Zaplanowane', in_transit: 'W transporcie', completed: 'Zakończone', cancelled: 'Anulowane' };
+            let html = '';
+            for (const [status, label] of Object.entries(sections)) {
+                const filtered = transports.filter(t => t.status === status);
+                html += `<div class="board-section"><h3>${label} (${filtered.length})</h3>`;
+                if (filtered.length) filtered.forEach(t => { const conflict = conflicts?.find(c => c.transportIds.includes(t.id)); html += `<div class="board-card priority-${t.priority || 1}" onclick="openRescheduleModal(${t.id})"><div class="board-card-title">${t.cargo_name}${conflict ? '<span class="conflict-badge">KONFLIKT</span>' : ''}</div><div class="board-card-meta"><span>🚚 ${t.car_name}</span><span>${formatDT(t.start_time)}</span></div></div>`; });
+                else html += '<div class="empty-state" style="padding:20px;font-size:13px;">Brak transportów</div>';
+                html += '</div>';
+            }
+            // Unassigned cargo
+            html += `<div class="board-section"><h3>📦 Nieprzypisane ładunki (${unassignedCargos.length})</h3>`;
+            if (unassignedCargos.length) unassignedCargos.forEach(c => { html += `<div class="board-card priority-${c.priority}"><div class="board-card-title">${c.name}</div><div class="board-card-meta"><span>${c.weight_kg} kg</span><span>${c.pickup_address?.substring(0,20) || ''}...</span></div></div>`; });
+            else html += '<div class="empty-state" style="padding:20px;font-size:13px;">Wszystkie ładunki przypisane</div>';
+            html += '</div>';
+            document.getElementById('board').innerHTML = html;
+        }
+
+        // ── Calendar ──
+        let calWeekStart = null;
+        function calNav(dir) {
+            calWeekStart = new Date(calWeekStart);
+            calWeekStart.setDate(calWeekStart.getDate() + dir * 7);
+            renderCalendar();
+        }
+        async function renderCalendar() {
+            await loadBoard();
+            const { cars, transports } = boardData;
+            // Determine week start (Monday)
+            const today = new Date();
+            if (!calWeekStart) {
+                calWeekStart = new Date(today);
+                calWeekStart.setDate(today.getDate() - today.getDay() + 1);
+            }
+            const days = [];
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(calWeekStart);
+                d.setDate(d.getDate() + i);
+                days.push(d);
+            }
+            const dayNames = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
+            document.getElementById('cal-period-label').textContent = `${days[0].toLocaleDateString('pl-PL', {day:'2-digit',month:'2-digit',year:'numeric'})} — ${days[6].toLocaleDateString('pl-PL', {day:'2-digit',month:'2-digit',year:'numeric'})}`;
+            const todayStr = today.toISOString().slice(0,10);
+            let html = `<div class="cal-grid" style="--cal-days:7">`;
+            html += `<div class="cal-corner">Samochód</div>`;
+            days.forEach(d => {
+                const isToday = d.toISOString().slice(0,10) === todayStr;
+                html += `<div class="cal-day-header"><div class="cal-day-name">${dayNames[d.getDay() === 0 ? 6 : d.getDay() - 1]}</div><div class="cal-day-num ${isToday ? 'today' : ''}">${d.getDate()}</div></div>`;
+            });
+            cars.forEach(car => {
+                html += `<div class="cal-car-label"><div class="cal-car-name">${car.name}</div><div class="cal-car-plate">${car.plate || '—'}</div><div class="cal-car-status"><span class="badge badge-${car.status}">${statusLabel(car.status)}</span></div></div>`;
+                days.forEach(d => {
+                    const dayStr = d.toISOString().slice(0,10);
+                    // Find transports for this car on this day
+                    const dayTransports = transports.filter(t => {
+                        if (t.car_id !== car.id) return false;
+                        if (t.status === 'cancelled' || t.status === 'completed') return false;
+                        const s = t.start_time.slice(0,10);
+                        const e = t.end_time.slice(0,10);
+                        return dayStr >= s && dayStr <= e;
+                    });
+                    html += `<div class="cal-cell">`;
+                    dayTransports.slice(0,3).forEach(t => {
+                        const p = t.priority || 1;
+                        html += `<div class="cal-bar cal-bar-${t.status} cal-bar-priority-${p}" onclick="openRescheduleModal(${t.id})" onmouseenter="calTooltip(event,'${t.cargo_name}','${t.car_name}','${formatDT(t.start_time)}','${formatDT(t.end_time)}')" onmouseleave="calHideTooltip()"><span class="cal-bar-cargo">${t.cargo_name}</span></div>`;
+                    });
+                    if (dayTransports.length > 3) html += `<div style="font-size:10px;color:#94a3b8;text-align:center;">+${dayTransports.length - 3}</div>`;
+                    html += `</div>`;
+                });
+            });
+            html += `</div>`;
+            document.getElementById('calendar-grid').innerHTML = html;
+        }
+        function calTooltip(e, cargo, car, start, end) {
+            let tt = document.getElementById('cal-tooltip');
+            if (!tt) { tt = document.createElement('div'); tt.id = 'cal-tooltip'; document.body.appendChild(tt); }
+            tt.innerHTML = `<div class="cal-tooltip-title">${cargo}</div><div class="cal-tooltip-meta">🚚 ${car}<br>⏱ ${start} — ${end}</div>`;
+            tt.style.left = e.clientX + 12 + 'px';
+            tt.style.top = e.clientY + 12 + 'px';
+        }
+        function calHideTooltip() { const tt = document.getElementById('cal-tooltip'); if (tt) tt.remove(); }
+
+        // ── Cars ──
+        async function renderCars() {
+            await loadBoard();
+            const { cars } = boardData;
+            document.getElementById('cars-table').innerHTML = cars.map(c => `<tr><td>${c.name}</td><td><span class="car-plate">${c.plate || '—'}</span></td><td>${c.brand || '—'}</td><td>${c.max_capacity_kg} kg</td><td><span class="badge badge-${c.status}">${statusLabel(c.status)}</span></td><td class="actions"><button class="btn btn-secondary btn-sm" onclick="editCar(${c.id})">Edytuj</button><button class="btn btn-danger btn-sm" onclick="deleteCar(${c.id})">Usuń</button></td></tr>`).join('');
+        }
+        function openCarModal(id = null) {
+            document.getElementById('car-modal').classList.remove('hidden');
+            document.getElementById('car-modal-title').textContent = id ? 'Edytuj samochód' : 'Nowy samochód';
+            document.getElementById('car-form').reset();
+            if (id) {
+                const c = boardData.cars.find(x => x.id === id);
+                document.getElementById('car-id').value = c.id;
+                document.getElementById('car-name').value = c.name;
+                document.getElementById('car-plate').value = c.plate || '';
+                document.getElementById('car-brand').value = c.brand || '';
+                document.getElementById('car-capacity').value = c.max_capacity_kg;
+                document.getElementById('car-status').value = c.status || 'available';
+            } else document.getElementById('car-id').value = '';
+        }
+        function closeCarModal() { document.getElementById('car-modal').classList.add('hidden'); }
+        async function editCar(id) { openCarModal(id); }
+        async function saveCar(e) {
+            e.preventDefault();
+            const id = document.getElementById('car-id').value;
+            const body = { name: document.getElementById('car-name').value, plate: document.getElementById('car-plate').value, brand: document.getElementById('car-brand').value, max_capacity_kg: parseInt(document.getElementById('car-capacity').value), status: document.getElementById('car-status').value };
+            try {
+                if (id) await fetch(`${API}/cars/${id}`, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                else await fetch(`${API}/cars`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                closeCarModal(); await refreshAll(); showToast('Zapisano samochód');
+            } catch { showToast('Błąd zapisu', 'error'); }
+        }
+        async function deleteCar(id) { if (!confirm('Usunąć samochód?')) return; try { await fetch(`${API}/cars/${id}`, {method:'DELETE'}); await refreshAll(); showToast('Usunięto'); } catch { showToast('Błąd', 'error'); } }
+
+        // ── Cargos ──
+        async function renderCargos() {
+            await loadBoard();
+            const { cargos } = boardData;
+            document.getElementById('cargos-table').innerHTML = cargos.map(c => `<tr><td class="priority-${c.priority}">${c.name}</td><td>${c.weight_kg} kg</td><td><span class="badge badge-${c.status}">P${c.priority}</span></td><td><span class="badge badge-${c.status}">${statusLabel(c.status)}</span></td><td><div style="font-size:12px;color:#94a3b8">${c.pickup_address?.substring(0,25)||'—'} → ${c.delivery_address?.substring(0,25)||'—'}</div></td><td class="actions"><button class="btn btn-secondary btn-sm" onclick="editCargo(${c.id})">Edytuj</button><button class="btn btn-danger btn-sm" onclick="deleteCargo(${c.id})">Usuń</button></td></tr>`).join('');
+        }
+        function openCargoModal(id = null) {
+            document.getElementById('cargo-modal').classList.remove('hidden');
+            document.getElementById('cargo-modal-title').textContent = id ? 'Edytuj ładunek' : 'Nowy ładunek';
+            document.getElementById('cargo-form').reset();
+            if (id) {
+                const c = boardData.cargos.find(x => x.id === id);
+                document.getElementById('cargo-id').value = c.id;
+                document.getElementById('cargo-name').value = c.name;
+                document.getElementById('cargo-weight').value = c.weight_kg;
+                document.getElementById('cargo-priority').value = c.priority;
+                document.getElementById('cargo-pickup').value = c.pickup_address || '';
+                document.getElementById('cargo-delivery').value = c.delivery_address || '';
+                document.getElementById('cargo-desc').value = c.description || '';
+            } else document.getElementById('cargo-id').value = '';
+        }
+        function closeCargoModal() { document.getElementById('cargo-modal').classList.add('hidden'); }
+        async function editCargo(id) { openCargoModal(id); }
+        async function saveCargo(e) {
+            e.preventDefault();
+            const id = document.getElementById('cargo-id').value;
+            const body = { name: document.getElementById('cargo-name').value, weight_kg: parseInt(document.getElementById('cargo-weight').value), priority: parseInt(document.getElementById('cargo-priority').value), pickup_address: document.getElementById('cargo-pickup').value, delivery_address: document.getElementById('cargo-delivery').value, description: document.getElementById('cargo-desc').value };
+            try {
+                if (id) await fetch(`${API}/cargos/${id}`, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                else await fetch(`${API}/cargos`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                closeCargoModal(); await refreshAll(); showToast('Zapisano ładunek');
+            } catch { showToast('Błąd zapisu', 'error'); }
+        }
+        async function deleteCargo(id) { if (!confirm('Usunąć ładunek?')) return; try { await fetch(`${API}/cargos/${id}`, {method:'DELETE'}); await refreshAll(); showToast('Usunięto'); } catch { showToast('Błąd', 'error'); } }
+
+        // ── Transports ──
+        async function renderTransports() {
+            await loadBoard();
+            const { transports, conflicts } = boardData;
+            document.getElementById('transports-table').innerHTML = transports.map(t => { const conflict = conflicts?.find(c => c.transportIds.includes(t.id)); return `<tr><td>${t.id}</td><td><b>${t.car_name}</b><br><span class="car-plate">${t.car_plate||''}</span></td><td class="priority-${t.priority}">${t.cargo_name}<br><span class="cargo-weight">${t.weight_kg} kg</span></td><td>${formatDT(t.start_time)}</td><td>${formatDT(t.end_time)}</td><td><span class="badge badge-${t.status}">${statusLabel(t.status)}</span>${conflict?' <span class="conflict-badge">KONFLIKT</span>':''}</td><td class="actions"><button class="btn btn-secondary btn-sm" onclick="openRescheduleModal(${t.id})">Przeplanuj</button><button class="btn btn-danger btn-sm" onclick="deleteTransport(${t.id})">Usuń</button></td></tr>`; }).join('');
+        }
+        async function openTransportModal(id = null) {
+            await loadBoard();
+            document.getElementById('transport-modal').classList.remove('hidden');
+            document.getElementById('transport-form').reset();
+            document.getElementById('transport-conflict').classList.add('hidden');
+            document.getElementById('transport-id').value = '';
+            // populate selects
+            const carsSel = document.getElementById('transport-car');
+            carsSel.innerHTML = boardData.cars.map(c => `<option value="${c.id}">${c.name} (${c.plate || 'brak'})</option>`).join('');
+            const cargosSel = document.getElementById('transport-cargo');
+            cargosSel.innerHTML = boardData.cargos.filter(c => c.status !== 'planned').map(c => `<option value="${c.id}">${c.name} (${c.weight_kg}kg, P${c.priority})</option>`).join('');
+            // default times
+            const now = new Date(); now.setHours(8,0,0,0);
+            const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate()+1);
+            document.getElementById('transport-start').value = tomorrow.toISOString().slice(0,16);
+            const endDay = new Date(tomorrow); endDay.setDate(endDay.getDate()+2);
+            document.getElementById('transport-end').value = endDay.toISOString().slice(0,16);
+        }
+        function closeTransportModal() { document.getElementById('transport-modal').classList.add('hidden'); }
+        document.getElementById('transport-car').addEventListener('change', checkTransportConflict);
+        document.getElementById('transport-start').addEventListener('change', checkTransportConflict);
+        document.getElementById('transport-end').addEventListener('change', checkTransportConflict);
+        async function checkTransportConflict() {
+            const carId = document.getElementById('transport-car').value;
+            const start = document.getElementById('transport-start').value;
+            const end = document.getElementById('transport-end').value;
+            if (!carId || !start || !end) return;
+            const body = { car_id: parseInt(carId), start_time: new Date(start).toISOString(), end_time: new Date(end).toISOString() };
+            try {
+                const r = await fetch(`${API}/transports?force=true`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                const data = await r.json();
+                if (data.conflict) { document.getElementById('transport-conflict').textContent = `⚠ Konflikt: ${data.conflict.carName} jest zajęty od ${formatDT(data.conflict.startTime)} do ${formatDT(data.conflict.endTime)} (${data.conflict.cargoName})`; document.getElementById('transport-conflict').classList.remove('hidden'); }
+                else document.getElementById('transport-conflict').classList.add('hidden');
+            } catch {}
+        }
+        async function saveTransport(e) {
+            e.preventDefault();
+            const force = document.getElementById('transport-force').checked;
+            const body = { car_id: parseInt(document.getElementById('transport-car').value), cargo_id: parseInt(document.getElementById('transport-cargo').value), start_time: new Date(document.getElementById('transport-start').value).toISOString(), end_time: new Date(document.getElementById('transport-end').value).toISOString(), notes: document.getElementById('transport-notes').value };
+            try {
+                const r = await fetch(`${API}/transports?force=${force}`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                const data = await r.json();
+                if (data.conflict && !force) { document.getElementById('transport-conflict').textContent = `⚠ Konflikt: samochód zajęty. Zaznacz "force" aby przypisać mimo to.`; document.getElementById('transport-conflict').classList.remove('hidden'); return; }
+                closeTransportModal(); await refreshAll(); showToast('Zapisano transport');
+            } catch { showToast('Błąd zapisu', 'error'); }
+        }
+        async function openRescheduleModal(id) {
+            await loadBoard();
+            const t = boardData.transports.find(x => x.id === id);
+            if (!t) return;
+            document.getElementById('reschedule-modal').classList.remove('hidden');
+            document.getElementById('reschedule-id').value = id;
+            document.getElementById('reschedule-form').reset();
+            document.getElementById('reschedule-conflict').classList.add('hidden');
+            const carsSel = document.getElementById('reschedule-car');
+            carsSel.innerHTML = boardData.cars.map(c => `<option value="${c.id}" ${c.id === t.car_id ? 'selected' : ''}>${c.name} (${c.plate || 'brak'})</option>`).join('');
+            document.getElementById('reschedule-start').value = t.start_time.slice(0,16);
+            document.getElementById('reschedule-end').value = t.end_time.slice(0,16);
+        }
+        function closeRescheduleModal() { document.getElementById('reschedule-modal').classList.add('hidden'); }
+        async function saveReschedule(e) {
+            e.preventDefault();
+            const id = document.getElementById('reschedule-id').value;
+            const force = document.getElementById('reschedule-force').checked;
+            const body = { car_id: parseInt(document.getElementById('reschedule-car').value) || undefined, start_time: document.getElementById('reschedule-start').value ? new Date(document.getElementById('reschedule-start').value).toISOString() : undefined, end_time: document.getElementById('reschedule-end').value ? new Date(document.getElementById('reschedule-end').value).toISOString() : undefined };
+            try {
+                const r = await fetch(`${API}/transports/${id}/reschedule?force=${force}`, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                const data = await r.json();
+                if (data.conflict && !force) { document.getElementById('reschedule-conflict').textContent = `⚠ Konflikt: samochód zajęty. Zaznacz "force" aby przypisać mimo to.`; document.getElementById('reschedule-conflict').classList.remove('hidden'); return; }
+                closeRescheduleModal(); await refreshAll(); showToast('Przeplanowano');
+            } catch { showToast('Błąd', 'error'); }
+        }
+        async function deleteTransport(id) { if (!confirm('Usunąć transport? Ładunek wróci do nieprzypisanych.')) return; try { await fetch(`${API}/transports/${id}`, {method:'DELETE'}); await refreshAll(); showToast('Usunięto'); } catch { showToast('Błąd', 'error'); } }
+
+        function statusLabel(s) { return {available:'Dostępny',in_transit:'W trasie',new:'Nowy',planned:'Zaplanowany',scheduled:'Zaplanowany',completed:'Zakończony',cancelled:'Anulowany'}[s] || s; }
+        function formatDT(s) { try { const d = new Date(s); return d.toLocaleString('pl-PL', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); } catch { return s; } }
+
+        // Init
+        loadBoard().then(renderBoard);
+    </script>
+</body>
+</html>
